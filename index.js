@@ -16,17 +16,21 @@ if (!TOKEN) {
 // Off by default — run !scanvideos manually unless you turn this on.
 const REALTIME = process.env.REALTIME_MODE === 'true';
 
-// When set, real-time deletion and the startup sweep only apply to this
-// channel. !scanvideos still works in any channel regardless of this setting.
-const CHANNEL_ID = process.env.CHANNEL_ID || null;
+// When set, real-time deletion and the startup sweep only apply to these
+// channels. !scanvideos still works in any channel regardless of this setting.
+// Accepts a single ID or a comma-separated list, e.g. "123,456".
+const CHANNEL_IDS = (process.env.CHANNEL_ID || '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
 
-// How many existing messages to sweep through on startup for CHANNEL_ID.
+// How many existing messages to sweep through on startup for each channel.
 // Default: entire history.
 const STARTUP_SCAN_LIMIT = process.env.STARTUP_SCAN_LIMIT
   ? parseInt(process.env.STARTUP_SCAN_LIMIT, 10)
   : Infinity;
 
-if (REALTIME && !CHANNEL_ID) {
+if (REALTIME && CHANNEL_IDS.length === 0) {
   console.error('REALTIME_MODE is on but CHANNEL_ID is not set in .env — refusing to start (this would nuke non-video messages server-wide).');
   process.exit(1);
 }
@@ -137,13 +141,15 @@ client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
   if (REALTIME) {
-    console.log(`Real-time mode is ON for channel ${CHANNEL_ID} — non-video messages there will be deleted as they arrive.`);
-    try {
-      const channel = await client.channels.fetch(CHANNEL_ID);
-      console.log(`Sweeping existing messages in #${channel.name || CHANNEL_ID}...`);
-      await scanAndPurge(channel, STARTUP_SCAN_LIMIT, { log: true });
-    } catch (err) {
-      console.error('Startup sweep failed:', err.message);
+    console.log(`Real-time mode is ON for channels [${CHANNEL_IDS.join(', ')}] — non-video messages there will be deleted as they arrive.`);
+    for (const channelId of CHANNEL_IDS) {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        console.log(`Sweeping existing messages in #${channel.name || channelId}...`);
+        await scanAndPurge(channel, STARTUP_SCAN_LIMIT, { log: true });
+      } catch (err) {
+        console.error(`Startup sweep failed for channel ${channelId}:`, err.message);
+      }
     }
   }
 });
@@ -154,7 +160,7 @@ client.once('ready', async () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  if (REALTIME && message.guild && message.channel.id === CHANNEL_ID) {
+  if (REALTIME && message.guild && CHANNEL_IDS.includes(message.channel.id)) {
     const preview = (message.content || '[no text]').slice(0, 60);
     if (messageHasVideo(message)) {
       console.log(`[KEEP] ${message.author.tag}: ${preview}`);
