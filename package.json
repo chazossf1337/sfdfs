@@ -1,0 +1,14 @@
+{
+  "name": "discord-video-mod-bot",
+  "version": "1.0.0",
+  "description": "Discord bot that deletes messages in a channel that don't contain a video",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5"
+  }
+}
