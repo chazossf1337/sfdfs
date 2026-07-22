@@ -52,11 +52,16 @@ const VIDEO_URL_PATTERNS = [
 
 function messageHasVideo(message) {
   for (const attachment of message.attachments.values()) {
+    const isGif = attachment.contentType === 'image/gif' || /\.gif$/i.test(attachment.name || attachment.url);
+    if (isGif) continue;
     if (attachment.contentType && attachment.contentType.startsWith('video/')) return true;
     if (VIDEO_EXTENSIONS.test(attachment.name || attachment.url)) return true;
   }
 
   for (const embed of message.embeds) {
+    // Tenor/Giphy links embed as type "gifv" with a `video` field (Discord
+    // serves GIFs as silent autoplay video under the hood) — don't count these.
+    if (embed.type === 'gifv') continue;
     if (embed.video) return true;
     if (embed.type === 'video') return true;
   }
